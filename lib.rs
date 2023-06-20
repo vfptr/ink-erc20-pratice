@@ -228,14 +228,8 @@ mod erc20 {
         }
     }
 
-    /// This is how you'd write end-to-end (E2E) or integration tests for ink! contracts.
-    ///
-    /// When running these you need to make sure that you:
-    /// - Compile the tests with the `e2e-tests` feature flag enabled (`--features e2e-tests`)
-    /// - Are running a Substrate node which contains `pallet-contracts` in the background
     #[cfg(all(test, feature = "e2e-tests"))]
     mod e2e_tests {
-        /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
 
         /// A helper function used for calling contract messages.
@@ -244,7 +238,7 @@ mod erc20 {
         /// The End-to-End test `Result` type.
         type E2EResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-        /// We test that we can upload and instantiate the contract using its default constructor.
+        /// construct the contract, and transfer from alice to bob, at last check the balance of alice.
         #[ink_e2e::test]
         async fn e2e_transfer_works(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
             let total_supply = 100_000;
@@ -277,8 +271,11 @@ mod erc20 {
             Ok(())
         }
 
+        /// test for approve first, then call transfer_from method. at last check the allowance,and balance.
         #[ink_e2e::test]
-        async fn e2e_approve_then_transfer_from_works(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
+        async fn e2e_approve_then_transfer_from_works(
+            mut client: ink_e2e::Client<C, E>,
+        ) -> E2EResult<()> {
             let total_supply = 100_000;
             let transfer_amount = 1_000;
             let constructor = Erc20Ref::new(total_supply);
@@ -300,7 +297,9 @@ mod erc20 {
 
             let transfer_from_msg = build_message::<Erc20Ref>(contract_account_id.clone())
                 .call(|erc20| erc20.transfer_from(alice_acc, charlie_acc, transfer_amount));
-            let res = client.call(&ink_e2e::bob(), transfer_from_msg, 0, None).await;
+            let res = client
+                .call(&ink_e2e::bob(), transfer_from_msg, 0, None)
+                .await;
             assert!(res.is_ok());
 
             let balance_of_msg = build_message::<Erc20Ref>(contract_account_id.clone())
@@ -309,12 +308,12 @@ mod erc20 {
                 .call_dry_run(&ink_e2e::alice(), &balance_of_msg, 0, None)
                 .await;
             assert_eq!(res.return_value(), total_supply - transfer_amount);
-            
+
             let allowance_msg = build_message::<Erc20Ref>(contract_account_id.clone())
                 .call(|erc20| erc20.allowance(alice_acc, bob_acc));
             let res = client
                 .call_dry_run(&ink_e2e::alice(), &allowance_msg, 0, None)
-                .await;//.expect("query allowance error");
+                .await; 
             assert_eq!(res.return_value(), 0);
 
             Ok(())
